@@ -1,0 +1,19 @@
+MP2 Monitor V2 — Firebase setup
+
+1. Create a Firebase project at https://console.firebase.google.com/ and stay on Spark (free).
+2. Authentication > Sign-in method > enable Google provider.
+3. Authentication > Settings > Authorized domains: add raynorcsuruelos.github.io (domain only, no path).
+4. Firestore Database > Create database > Standard edition. Choose a location and apply firestore.rules from this ZIP in Firestore > Rules; publish rules.
+5. Project settings > Your apps > add Web app > copy firebaseConfig object.
+6. Upload index.html, sw.js, manifest.webmanifest and icons folder to the ROOT of your myMP2tracker GitHub Pages repository. Do not upload the README/rules as public web assets if not needed.
+7. Open the PWA, Firebase setup > paste config JSON > Save > reload > Sign in with Google.
+8. Approve first upload. Existing IndexedDB stays on the same website origin. Keep a JSON export before deploying.
+
+Notes: Firebase config values are client identifiers, NOT service account private keys. Do not paste a private key.
+The Firebase SDK is fetched from Google CDN when online. Local IndexedDB continues working offline.
+Cloud sync runs only while the app is open and signed in. First sync and differing copies require explicit choice.
+One snapshot is stored at users/{uid}/mp2/snapshot, secured by UID. This is snapshot sync, not per-entry merging.
+On another device, sign in, review the cloud/local conflict prompt, and select Use cloud copy.
+Do not clear browser site data before exporting JSON.
+
+CONFIGURED FOR: mp2---monitor. No Firebase config paste required. Deploy the full directory to GitHub Pages, sign in with Google, and explicitly approve first upload. Keep a JSON backup before replacing deployed files.

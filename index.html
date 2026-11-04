@@ -1,0 +1,945 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}@media(max-width:480px){.wrap{gap:26px}.hero{padding:16px 14px}.top h1{font-size:26px}.acct-h{padding:14px 12px}.panel{padding:12px}.scroll{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}.btn{min-height:44px}#chart svg{touch-action:pan-y}}
+</style><title>MP2 Monitor V2</title>
+<meta name="theme-color" content="#0B6B4D">
+<link rel="manifest" href="./manifest.webmanifest">
+</head><body>
+
+<link rel="icon" type="image/png" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- Offline-first: system font fallbacks retain the design without network access. -->
+<style>
+/* Layout: one passbook column. Big value first, growth chart to maturity, one ruled ledger per MP2 account, then the declared-rate table. */
+:root{
+  --bg:#F1F4F2; --surface:#FFFFFF; --sunk:#E7ECE9; --ink:#12201B; --ink-2:#51625B; --line:#D3DCD7;
+  --accent:#0B6B4D; --on-accent:#FFFFFF; --accent-soft:#D8EDE3; --gold:#7D5400; --gold-soft:#F6E9C9; --bad:#B3261E;
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1311; --surface:#141E1B; --sunk:#0F1815; --ink:#E6EEEA; --ink-2:#9DB0A8; --line:#26352F;
+    --accent:#4CCB9B; --on-accent:#06150F; --accent-soft:#16342A; --gold:#E2B24A; --gold-soft:#2C2410; --bad:#FF8A80;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1311; --surface:#141E1B; --sunk:#0F1815; --ink:#E6EEEA; --ink-2:#9DB0A8; --line:#26352F;
+  --accent:#4CCB9B; --on-accent:#06150F; --accent-soft:#16342A; --gold:#E2B24A; --gold-soft:#2C2410; --bad:#FF8A80;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--body); font-size:15px; line-height:1.5;
+  padding-block:20px 64px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+.wrap>*{min-width:0}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-0.01em}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-2)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.top h1{font-size:30px;font-weight:700;line-height:1.1;margin-top:4px}
+.mp2-subtitle{font-size:12px;color:var(--ink-2);margin-top:6px;overflow-wrap:anywhere}
+.pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;background:var(--sunk);color:var(--ink-2);border:1px solid var(--line)}
+
+.notice{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;border:1px dashed var(--gold);background:var(--gold-soft);border-radius:10px;color:var(--ink)}
+.notice p{flex:1 1 240px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;font-size:14px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--accent);padding-inline:8px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 18px;display:flex;flex-direction:column;gap:18px}
+.hero .big{font-family:var(--display);font-weight:700;font-size:clamp(40px,12vw,68px);line-height:1;letter-spacing:-0.025em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px 18px;margin:0}
+.facts div{min-width:0}
+.facts dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.facts dd{margin:2px 0 0;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.facts dd small{display:block;font-size:12px;font-weight:400;color:var(--ink-2)}
+.nextdiv{border-top:1px solid var(--line);padding-top:14px;color:var(--ink-2)}
+.nextdiv b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sec-head h2{font-size:21px;font-weight:650}
+.sec-head p{color:var(--ink-2);font-size:13.5px;max-width:52ch}
+
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.controls label{font-size:13px;color:var(--ink-2)}
+.controls input[type=range]{flex:1 1 160px;min-width:0;accent-color:var(--accent)}
+.rateinp{width:92px}
+
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px}
+#readout{font-size:13px;min-height:40px;color:var(--ink-2);display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline;padding:0 4px 6px}
+#readout b{color:var(--ink);font-variant-numeric:tabular-nums}
+#chart svg{display:block;width:100%;height:auto;touch-action:pan-y}
+#chart text{font-family:var(--mono);font-size:10.5px;fill:var(--ink-2)}
+.grid{stroke:var(--line);stroke-width:1}
+.axis{stroke:var(--ink-2);stroke-width:1}
+.a-val{fill:var(--accent);opacity:.28}
+.a-con{fill:var(--ink-2);opacity:.28}
+.l-val{fill:none;stroke:var(--accent);stroke-width:2.25;stroke-linejoin:round}
+.l-con{fill:none;stroke:var(--ink-2);stroke-width:1.5;stroke-linejoin:round}
+.today{stroke:var(--gold);stroke-width:1.25;stroke-dasharray:4 3}
+.xh{stroke:var(--ink);stroke-width:1}
+.mat{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--ink-2);padding:8px 4px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+.scen{margin-top:14px}
+.scen h3{font-size:15px;font-weight:650;margin-bottom:4px}
+.scen p.note{font-size:13px;color:var(--ink-2);margin-bottom:8px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-2);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+th.n,td.n{text-align:right}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+td.mono{font-family:var(--mono);font-size:13px}
+td .asm{font-style:italic;color:var(--ink-2)}
+
+.accts{display:flex;flex-direction:column;gap:16px}
+.acct{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.acct-h{padding:16px 16px 12px;display:flex;flex-direction:column;gap:12px}
+.acct-title{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.acct-title h3{font-size:18px;font-weight:650;overflow-wrap:anywhere}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:999px;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
+.chip.ok{background:var(--accent-soft);color:var(--accent)}
+.chip.warn{background:var(--gold-soft);color:var(--gold)}
+.term{height:8px;background:var(--sunk);border-radius:4px;position:relative;overflow:hidden}
+.term i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:4px}
+.term-cap{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.acct .facts dd{font-size:16px}
+.acct-actions{padding:0 12px 12px;display:flex;gap:6px;flex-wrap:wrap}
+.panel{border-top:1px solid var(--line);padding:14px 16px;background:var(--sunk);display:flex;flex-direction:column;gap:14px}
+.panel h4{margin:0;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+.panel .tbl{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 6px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}
+.fields label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--ink-2);min-width:0}
+input,select,textarea{width:100%;min-height:42px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:16px;min-width:0}
+textarea{min-height:84px;font-family:var(--mono);font-size:13px}
+.err{color:var(--bad);font-size:13px}
+.hint{color:var(--ink-2);font-size:12.5px}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+details[open] summary{margin-bottom:8px}
+.xbtn{border:none;background:transparent;color:var(--ink-2);cursor:pointer;min-width:36px;min-height:32px;border-radius:6px;font-size:16px}
+.xbtn:hover{color:var(--bad)}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--ink-2);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+.rates td input{width:96px;min-height:36px;padding:4px 8px;font-size:15px;font-family:var(--mono)}
+.foot{color:var(--ink-2);font-size:13px;display:flex;flex-direction:column;gap:10px}
+.foot ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.foot a{overflow-wrap:anywhere}
+
+#toast{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none;
+  padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+#toast>div{pointer-events:auto;background:var(--ink);color:var(--bg);border-radius:10px;padding:8px 8px 8px 14px;display:flex;gap:10px;align-items:center;font-size:14px;max-width:100%}
+#toast button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:7px;min-height:32px;padding:2px 12px;font-weight:600;cursor:pointer}
+#notice{display:flex;flex-direction:column;gap:10px}
+#notice:empty{display:none}
+.notice.soon{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+a.btn{text-decoration:none;color:inherit}
+.copybox{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.copybox textarea{min-height:120px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Pag-IBIG · Modified Pag-IBIG 2 Savings</p>
+      <h1>MP2 Monitor <span style="font-size:.42em;vertical-align:middle;color:var(--ink-2)">V2</span></h1>
+      <p class="mp2-subtitle">raynorcsuruelos@gmail.com</p>
+    </div>
+    <span class="pill" id="status" role="status">Checking saved data…</span>
+  </header>
+
+  <div id="notice"></div>
+  <section id="hero" aria-label="Summary"></section>
+
+  <section aria-labelledby="h-proj">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-proj">Growth to maturity</h2>
+        <p>Contributions and estimated dividends through each account's 5-year term. After maturity, unwithdrawn balances may earn P1-rate estimates for up to 24 months when a P1 rate is entered.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <label for="assumed">Dividend rate for years not declared yet</label>
+      <input class="rateinp mono" id="assumed" type="number" inputmode="decimal" min="0" max="15" step="0.01" aria-describedby="assumed-hint">
+      <span class="mono">%</span>
+      <input id="assumed-range" type="range" min="3" max="10" step="0.05" aria-label="Assumed dividend rate">
+    </div>
+    <div class="chartbox">
+      <div id="readout" class="mono" aria-live="off"></div>
+      <div id="chart"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Estimated value</span>
+        <span><i style="background:var(--ink-2)"></i>Contributed</span>
+        <span><i style="background:var(--gold)"></i>Today</span>
+        <span>○ An account matures</span>
+      </div>
+    </div>
+    <div class="scen" id="scen"></div>
+  </section>
+
+  <section aria-labelledby="h-acc">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-acc">Accounts</h2>
+        <p>Each MP2 account has its own 5-year term. Log what you have put in; the page works out the rest.</p>
+      </div>
+      <button class="btn primary" type="button" id="add-acct">Add account</button>
+    </div>
+    <div class="accts" id="accounts"></div>
+  </section>
+
+  <section aria-labelledby="h-rates">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-rates">Declared dividend rates</h2>
+        <p>Each row is the year the dividend was earned. Pag-IBIG declares it the following February or March, so the 2022 rate of 7.03% was declared in 2023. Edit a value or clear a row to use your assumed rate.</p>
+      </div>
+    </div>
+    <div class="scroll" id="rates"></div>
+  </section>
+
+<section aria-labelledby="h-cloud" id="firebase-cloud"><div class="sec-head"><div><h2 id="h-cloud">Cloud sync · Firebase</h2><p>IndexedDB remains the offline source. Sign in to sync your private account snapshot.</p></div></div><div class="hero" style="gap:12px"><p id="fb-status" role="status" class="hint">Not configured · local storage remains available.</p><details><summary>Firebase setup</summary><p class="hint">Paste your Firebase Web App configuration JSON from Firebase Console → Project settings → Your apps. This is public client configuration, not a service account key.</p><textarea id="fb-config" spellcheck="false" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","appId":"..."}'></textarea><div class="row"><button class="btn" id="fb-save-config" type="button">Save Firebase configuration</button></div></details><div class="row"><button class="btn primary" id="fb-signin" type="button">Sign in with Google</button><button class="btn" id="fb-signout" type="button" hidden>Sign out</button><button class="btn" id="fb-sync" type="button" disabled>Sync now</button></div><p class="hint">First sync and conflicts require your approval. Changes sync automatically while this page is open and online. Keep periodic JSON backups.</p><div id="fb-decision" hidden class="notice"><p id="fb-decision-text"></p><div class="row"><button class="btn primary" id="fb-use-local" type="button">Upload local copy</button><button class="btn" id="fb-use-cloud" type="button">Use cloud copy</button><button class="btn" id="fb-cancel" type="button">Not now</button></div></div></div></section>
+  <section aria-labelledby="h-bak">
+    <div class="sec-head">
+      <div>
+        <h2 id="h-bak">Backup</h2>
+        <p>Your data is saved locally in this browser using IndexedDB. Export JSON regularly to keep a portable backup.</p>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn" type="button" id="exp">Export JSON</button>
+      <button class="btn" type="button" id="impbtn">Import JSON</button>
+      <input type="file" id="imp" accept=".json,application/json" hidden>
+    </div>
+    <p class="hint" id="bak-msg" role="status" style="margin-top:8px"></p>
+    <div id="bak-extra"></div>
+  </section>
+
+  <footer class="foot">
+    <details>
+      <summary>How the estimates work</summary>
+      <ul>
+        <li>Dividends are estimated monthly: contributions made on any day of the same calendar month count equally. Each month earns the annual rate divided by 12 on that month's eligible balance. The fifth-anniversary month is excluded. Official crediting may differ.</li>
+        <li>Years without a declared rate, including the current one, use the rate you set above.</li>
+        <li>"Dividends compound" adds estimated annual dividends to the next year's earning balance. "Paid out yearly" shows estimated dividends separately from principal; actual payments are not verified.</li>
+        <li>An account matures 5 years after its opening date. Projected monthly contributions are not actual deposits. A matured account is not automatically marked withdrawn.</li>
+        <li>These are illustrative estimates, not official Pag-IBIG balances, payments or withdrawals. Verify dates, accrual rules and actual payouts with Virtual Pag-IBIG.</li>
+      </ul>
+    </details>
+    <p>Rates from the <a href="https://sweldoph.com/guides/mp2-dividend-history" target="_blank" rel="noopener">MP2 rate history</a> compiled by SweldoPH. The 2025 rate of 7.12% is from the <a href="https://mb.com.ph/2026/02/27/pag-ibig-fund-declares-record-p6434-b-dividends-for-2025" target="_blank" rel="noopener">February 2026 Pag-IBIG announcement</a>.</p>
+  </footer>
+</div>
+<div id="toast" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+// <calc>
+const DAY = 86400000;
+const p2 = n => String(n).padStart(2,'0');
+function pd(s){ const a=s.split('-').map(Number); return Date.UTC(a[0],a[1]-1,a[2]); }
+function dn(s){ return Math.floor(pd(s)/DAY); }
+function ds(ms){ const d=new Date(ms); return d.getUTCFullYear()+'-'+p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate()); }
+function isISO(s){ return typeof s==='string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(pd(s)) && ds(pd(s))===s; }
+function addYears(s,n){
+  const a=s.split('-').map(Number); let t=new Date(Date.UTC(a[0]+n,a[1]-1,a[2]));
+  if(t.getUTCMonth()!==a[1]-1) t=new Date(Date.UTC(a[0]+n,a[1],0));
+  return ds(t.getTime());
+}
+const DEFAULT_RATES={2014:4.69,2015:5.34,2016:7.43,2017:8.11,2018:7.41,2019:7.23,2020:6.12,2021:6.00,2022:7.03,2023:7.05,2024:7.10,2025:7.12};
+
+function planned(acc, todayS){
+  if(!(acc.monthly>0)) return [];
+  const mat=addYears(acc.opened,5), out=[];
+  const last=acc.contribs.reduce((m,c)=>c.date>m?c.date:m, todayS);
+  const dom=Number(acc.opened.slice(8,10));
+  let y=Number(last.slice(0,4)), m=Number(last.slice(5,7));
+  for(let i=0;i<130;i++){
+    const dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+    const dd=ds(Date.UTC(y,m-1,Math.min(dom,dim)));
+    if(dd>last){ if(dd>=mat) break; out.push({date:dd,amount:acc.monthly}); }
+    m++; if(m>12){m=1;y++;}
+  }
+  return out;
+}
+
+function simulate(acc, rates, assumed, todayS, asOfS, withPlanned){
+  // Month-based MP2 estimate: all deposits within a calendar month earn
+  // the same monthly dividend, regardless of the day deposited.
+  // The fifth-anniversary month is included. Afterward, an unwithdrawn balance may earn P1-rate dividends for up to 24 months.
+  const mat=addYears(acc.opened,5), graceEnd=addYears(mat,2);
+  const cutoff=acc.withdrawn && isISO(acc.withdrawn) && acc.withdrawn<graceEnd?acc.withdrawn:graceEnd;
+  const endS=asOfS<cutoff?asOfS:cutoff;
+  if(endS<acc.opened)return {principal:0,div:0,value:0,balance:0,paidEstimate:0,rows:[],mat};
+  const matMonth=mat.slice(0,7), lastMonth=endS.slice(0,7);
+  const entries=acc.contribs.filter(c=>c.date>=acc.opened && c.date<mat)
+    .map(c=>({month:c.date.slice(0,7),amount:c.amount}));
+  if(withPlanned) for(const c of planned(acc,todayS)) entries.push({month:c.date.slice(0,7),amount:c.amount});
+  const byMonth=new Map();
+  for(const e of entries) byMonth.set(e.month,(byMonth.get(e.month)||0)+e.amount);
+  let principal=0,compounded=0,div=0,paidEstimate=0;
+  const rows=[];
+  const firstYear=Number(acc.opened.slice(0,4));
+  const lastYear=Number(endS.slice(0,4));
+  for(let year=firstYear;year<=lastYear;year++){
+    let annualDiv=0,added=0,months=0;
+    const declared=rates[year]!=null && rates[year]!=='' && Number.isFinite(Number(rates[year]));
+    const rate=declared?Number(rates[year]):assumed;
+    for(let month=1;month<=12;month++){
+      const key=year+'-'+p2(month);
+      if(key<acc.opened.slice(0,7) || key>matMonth || key>lastMonth) continue;
+      const amount=byMonth.get(key)||0;
+      principal+=amount; added+=amount;
+      annualDiv+=(principal+compounded)*rate/1200;
+      months++;
+    }
+    if(!months && !added)continue;
+    div+=annualDiv;
+    if(acc.mode==='compound')compounded+=annualDiv;
+    else paidEstimate+=annualDiv;
+    rows.push({year,rate,declared,added,div:annualDiv,
+      balance:principal+compounded,partial:year===firstYear || year===lastYear && endS.slice(5)!=='12-31'});
+  }
+  // Post-maturity P1 estimate is separate from MP2 dividends and is not
+  // computed without an explicitly supplied P1 annual rate.
+  const mp2Div=div, mp2Balance=principal+compounded;
+  let p1Div=0, p1Months=0;
+  const p1Rate=acc.p1Rate!=='' && acc.p1Rate!=null && Number.isFinite(Number(acc.p1Rate))?Number(acc.p1Rate):null;
+  if(lastMonth>matMonth && p1Rate!==null){
+    const startY=Number(mat.slice(0,4)),startM=Number(mat.slice(5,7));
+    let yy=startY,mm=startM+1;
+    if(mm>12){yy++;mm=1;}
+    const base=acc.mode==='compound'?mp2Balance:principal;
+    for(let i=0;i<24;i++){
+      const key=yy+'-'+p2(mm);
+      if(key>lastMonth || key>graceEnd.slice(0,7))break;
+      p1Div+=base*p1Rate/1200;p1Months++;
+      mm++;if(mm>12){mm=1;yy++;}
+    }
+  }
+  div+=p1Div;
+  const balance=mp2Balance+p1Div;
+  return {principal,div,value:acc.mode==='payout'?principal+p1Div:balance,balance,paidEstimate,rows,mat,graceEnd,mp2Div,p1Div,p1Months,p1Rate};
+}
+
+// </calc>
+
+const $=(s,r)=>(r||document).querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const FMT0=new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP',maximumFractionDigits:0});
+const FMT2=new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP',minimumFractionDigits:2,maximumFractionDigits:2});
+const peso0=v=>FMT0.format(Math.round(v)), peso2=v=>FMT2.format(v);
+const pct=v=>(Math.round(v*100)/100).toFixed(2)+'%';
+function fmtDate(s){ return new Date(pd(s)).toLocaleDateString('en-PH',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}); }
+function fmtMonth(ms){ return new Date(ms).toLocaleDateString('en-PH',{month:'short',year:'numeric',timeZone:'UTC'}); }
+const uid=()=>Math.random().toString(36).slice(2,9);
+function manilaToday(){
+  try{ const s=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); if(isISO(s)) return s; }catch(e){}
+  return ds(Date.now());
+}
+const TODAY=manilaToday(), THIS_YEAR=Number(TODAY.slice(0,4));
+
+function span(fromS,toS){
+  const a=fromS.split('-').map(Number), b=toS.split('-').map(Number);
+  let months=(b[0]-a[0])*12+(b[1]-a[1])-(b[2]<a[2]?1:0);
+  if(months<1){ const d=Math.max(0,dn(toS)-dn(fromS)); return d+(d===1?' day':' days'); }
+  const y=Math.floor(months/12), m=months%12, out=[];
+  if(y) out.push(y+' yr'); if(m) out.push(m+' mo');
+  return out.join(' ');
+}
+
+// ---------- state ----------
+function freshState(){ return {v:1,assumed:7.12,rates:Object.assign({},DEFAULT_RATES),accounts:[]}; }
+function monthlyDates(startS,endS,day){
+  const out=[]; let y=Number(startS.slice(0,4)), m=Number(startS.slice(5,7));
+  for(let i=0;i<200;i++){
+    const dim=new Date(Date.UTC(y,m,0)).getUTCDate(), d=ds(Date.UTC(y,m-1,Math.min(day,dim)));
+    if(d>endS) break; if(d>=startS) out.push(d);
+    m++; if(m>12){m=1;y++;}
+  }
+  return out;
+}
+function sampleState(){
+  const s=freshState();
+  s.accounts.push(
+    {id:'ex1',name:'Example: Emergency fund',opened:'2024-02-10',mode:'compound',monthly:2000,
+     contribs:monthlyDates('2024-02-10',TODAY,10).map((d,i)=>({id:'e1-'+i,date:d,amount:2000}))},
+    {id:'ex2',name:'Example: Tuition fund',opened:'2022-06-15',mode:'payout',monthly:5000,
+     contribs:monthlyDates('2022-06-15',TODAY,15).map((d,i)=>({id:'e2-'+i,date:d,amount:5000}))}
+  );
+  return s;
+}
+function normalize(d){
+  const s=freshState();
+  if(d && typeof d==='object'){
+    if(d.assumed!=='' && Number.isFinite(Number(d.assumed))) s.assumed=Math.min(15,Math.max(0,Number(d.assumed)));
+    if(d.rates && typeof d.rates==='object'){ s.rates={}; for(const k in d.rates){ if(/^\d{4}$/.test(k) && d.rates[k]!=='' && Number.isFinite(Number(d.rates[k])) && Number(d.rates[k])>=0 && Number(d.rates[k])<=20) s.rates[k]=Number(d.rates[k]); } }
+    if(Array.isArray(d.accounts)){
+      s.accounts=d.accounts.filter(a=>a && isISO(a.opened)).map(a=>({
+        id:String(a.id||uid()), name:String(a.name||'MP2 account'), opened:a.opened,
+        mode:a.mode==='payout'?'payout':'compound', p1Rate:a.p1Rate!=='' && a.p1Rate!=null && Number.isFinite(Number(a.p1Rate)) && Number(a.p1Rate)>=0 && Number(a.p1Rate)<=20?Number(a.p1Rate):'', withdrawn:isISO(a.withdrawn)?a.withdrawn:'', monthly:Number.isFinite(Number(a.monthly))?Math.max(0,Number(a.monthly)):0,
+        contribs:(Array.isArray(a.contribs)?a.contribs:[]).filter(c=>c && isISO(c.date) && Number.isFinite(Number(c.amount)) && Number(c.amount)>0 && c.date>=a.opened && c.date<addYears(a.opened,5)).map(c=>({id:String(c.id||uid()),date:c.date,amount:Number(c.amount)}))
+      }));
+    }
+  }
+  return s;
+}
+
+let state=sampleState(), isSample=true, loaded=false;
+const ui={open:{},edit:{},all:{},err:{},confirm:{},adding:false,addErr:''};
+let storeKind='none';
+
+// ---------- durable offline storage ----------
+let saveTimer=null, saving=false, dirty=false, revision=0;
+const LS_KEY='mp2-monitor-v1', DB_NAME='mp2-monitor';
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    try{const req=indexedDB.open(DB_NAME,1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('kv'))req.result.createObjectStore('kv');};
+      req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error);
+    }catch(e){rej(e);}
+  });
+}
+async function idbGet(key='state'){
+  const db=await idbOpen();
+  return new Promise((res,rej)=>{const q=db.transaction('kv','readonly').objectStore('kv').get(key);
+    q.onsuccess=()=>{db.close();res(q.result||null);};q.onerror=()=>{db.close();rej(q.error);};});
+}
+async function idbSet(v){
+  const db=await idbOpen();
+  return new Promise((res,rej)=>{const tx=db.transaction('kv','readwrite'),store=tx.objectStore('kv');
+    store.put(v,'state');store.put({savedAt:new Date().toISOString(),data:v},'recovery');
+    tx.oncomplete=()=>{db.close();res();};tx.onerror=()=>{db.close();rej(tx.error);};tx.onabort=()=>{db.close();rej(tx.error);};});
+}
+function setStatus(k){
+  const t={loading:'Checking saved data…',saved:'Saved locally · IndexedDB',saving:'Saving…',error:'Save failed · export a JSON backup',ready:'Stored locally · IndexedDB',recovered:'Recovered saved data · IndexedDB'}[k]||'';
+  $('#status').textContent=t;
+}
+function scheduleSave(){dirty=true;revision++;clearTimeout(saveTimer);saveTimer=setTimeout(flush,500);window.dispatchEvent(new Event('mp2-local-change'));}
+async function flush(){
+  if(saving){saveTimer=setTimeout(flush,300);return;}
+  if(!dirty || isSample)return;
+  dirty=false;saving=true;setStatus('saving');const rev=revision;
+  try{await idbSet(JSON.parse(JSON.stringify(state)));if(rev===revision)setStatus('saved');}
+  catch(e){dirty=true;setStatus('error');saveTimer=setTimeout(flush,4000);}
+  finally{saving=false;if(dirty && rev!==revision){clearTimeout(saveTimer);saveTimer=setTimeout(flush,200);}}
+}
+async function initStore(){
+  try{
+    let d=await idbGet();let recovered=false;
+    if(!d){const backup=await idbGet('recovery');if(backup && backup.data){d=backup.data;recovered=true;}}
+    if(!d){try{const raw=localStorage.getItem(LS_KEY);if(raw){d=JSON.parse(raw);recovered=true;}}catch(e){}}
+    if(d){state=normalize(d);isSample=false;if(recovered)scheduleSave();}
+    loaded=true;setStatus(recovered?'recovered':'ready');renderAll();window.dispatchEvent(new Event('mp2-local-ready'));
+  }catch(e){
+    try{const raw=localStorage.getItem(LS_KEY);if(raw){state=normalize(JSON.parse(raw));isSample=false;}}
+    catch(err){}
+    loaded=true;setStatus('error');renderAll();window.dispatchEvent(new Event('mp2-local-ready'));
+  }
+}
+window.addEventListener('pagehide',()=>{if(dirty)flush();});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden' && dirty)flush();});
+
+// ---------- calculations for the page ----------
+const simCache=new Map();
+function cachedSim(a,assumed,asOf,plannedFlag){
+  const key=revision+'|'+a.id+'|'+assumed+'|'+asOf+'|'+plannedFlag;
+  if(simCache.has(key))return simCache.get(key);
+  if(simCache.size>1600)simCache.clear();
+  const result=simulate(a,state.rates,assumed,TODAY,asOf,plannedFlag);
+  simCache.set(key,result);return result;
+}
+function portfolio(assumed){
+  const per=[]; let contributed=0,value=0,div=0,nextDiv=0,fValue=0,fDiv=0,fContrib=0,nextMat=null;
+  for(const a of state.accounts){
+    const mat=addYears(a.opened,5), matured=TODAY>=mat;
+    const now=cachedSim(a,assumed,TODAY,false);
+    const end=cachedSim(a,assumed,mat,true);
+    const yr=cachedSim(a,assumed,(THIS_YEAR+1)+'-01-01',true);
+    const row=yr.rows.find(r=>r.year===THIS_YEAR);
+    if(!matured && row) nextDiv+=row.div;
+    if(!matured && (nextMat===null||mat<nextMat)) nextMat=mat;
+    contributed+=now.principal; value+=now.value; div+=now.div;
+    fValue+=end.value; fDiv+=end.div; fContrib+=end.principal;
+    per.push({a,mat,matured,now,end});
+  }
+  return {per,contributed,value,div,nextDiv,fValue,fDiv,fContrib,nextMat};
+}
+
+// ---------- render: hero ----------
+function renderNotice(){
+  const el=$('#notice'); let h='';
+  if(isSample && loaded){
+    h+='<div class="notice"><p>These are example numbers for two made-up accounts. Start with your own to see your real position.</p><button class="btn primary" type="button" data-act="start">Start with my accounts</button></div>';
+  }
+  if(!isSample){
+    const rows=state.accounts.map(a=>({a,mat:addYears(a.opened,5)}));
+    const soon=rows.filter(x=>x.mat>TODAY && dn(x.mat)-dn(TODAY)<=90).sort((p,q)=>p.mat.localeCompare(q.mat));
+    const recent=rows.filter(x=>x.mat<=TODAY && dn(TODAY)-dn(x.mat)<=30);
+    if(soon.length) h+='<div class="notice soon"><p><b>Maturing soon.</b> '+soon.map(x=>esc(x.a.name)+' on '+esc(fmtDate(x.mat))+' (in '+span(TODAY,x.mat)+')').join('; ')+'.</p></div>';
+    if(recent.length) h+='<div class="notice soon"><p><b>Recently matured.</b> '+recent.map(x=>esc(x.a.name)+' on '+esc(fmtDate(x.mat))).join('; ')+'.</p></div>';
+  }
+  el.innerHTML=h;
+}
+function renderHero(){
+  const P=portfolio(state.assumed), el=$('#hero');
+  if(!state.accounts.length){
+    el.innerHTML='<div class="empty"><div><h2 style="font-size:20px">No MP2 accounts yet</h2><p>Add an account with its opening date and what you have contributed so far.</p></div><button class="btn primary" type="button" data-act="add">Add account</button></div>';
+    return;
+  }
+  const rateYr=state.rates[THIS_YEAR]!=null&&state.rates[THIS_YEAR]!==''?Number(state.rates[THIS_YEAR]):state.assumed;
+  const decl=state.rates[THIS_YEAR]!=null&&state.rates[THIS_YEAR]!=='';
+  const nm=P.nextMat?('<dd>'+fmtDate(P.nextMat)+'<small>in '+span(TODAY,P.nextMat)+'</small></dd>'):'<dd>All matured<small>No active terms left</small></dd>';
+  el.innerHTML='<div class="hero">'
+    +'<div><p class="eyebrow">Estimated value today · '+esc(fmtDate(TODAY))+'</p><p class="big" id="bigval">'+peso0(P.value)+'</p></div>'
+    +'<dl class="facts">'
+    +'<div><dt>Contributed</dt><dd>'+peso0(P.contributed)+'</dd></div>'
+    +'<div><dt>Estimated dividends (including annual payouts)</dt><dd>'+peso0(P.div)+'</dd></div>'
+    +'<div><dt>Next maturity</dt>'+nm+'</div>'
+    +'</dl>'
+    +(P.nextDiv>0?'<p class="nextdiv">Your '+THIS_YEAR+' dividend should come to about <b>'+peso0(P.nextDiv)+'</b> at '+pct(rateYr)+(decl?' (declared rate)':' (your assumed rate)')+'. Pag-IBIG has announced the last two in late February.</p>':'')
+    +'</div>';
+}
+
+// ---------- render: chart ----------
+let chartData=null;
+function niceStep(max,n){ const raw=max/n, mag=Math.pow(10,Math.floor(Math.log10(raw))), f=raw/mag; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*mag; }
+function abbr(v){
+  if(v>=1e6){ const x=v/1e6; return '₱'+(Number.isInteger(x)?x:x.toFixed(1))+'M'; }
+  if(v>=1e3){ const x=v/1e3; return '₱'+(Number.isInteger(x)?x:x.toFixed(1))+'K'; }
+  return '₱'+v;
+}
+function combinedAt(s){
+  let c=0,v=0;
+  for(const a of state.accounts){ const r=cachedSim(a,state.assumed,s,true); c+=r.principal; v+=r.value; }
+  return {c,v};
+}
+function renderChart(){
+  const el=$('#chart'), ro=$('#readout');
+  if(!state.accounts.length){ el.innerHTML='<p class="hint" style="padding:18px 4px">The growth chart appears once you add an account.</p>'; ro.textContent=''; chartData=null; return; }
+  const W=Math.max(280,Math.floor(el.clientWidth||340)), H=250, m={l:50,r:12,t:14,b:26};
+  const startS=state.accounts.map(a=>a.opened).sort()[0].slice(0,7)+'-01';
+  const endS=state.accounts.map(a=>addYears(a.opened,5)).sort().slice(-1)[0];
+  const s0=dn(startS), s1=dn(endS);
+  const pts=[]; let y=Number(startS.slice(0,4)), mo=Number(startS.slice(5,7));
+  for(let i=0;i<260;i++){
+    const d=ds(Date.UTC(y,mo-1,1)); if(d>=endS) break;
+    const r=combinedAt(d); pts.push({day:dn(d),s:d,c:r.c,v:r.v});
+    mo++; if(mo>12){mo=1;y++;}
+  }
+  const rEnd=combinedAt(endS); pts.push({day:s1,s:endS,c:rEnd.c,v:rEnd.v});
+  const vmax=Math.max.apply(null,pts.map(p=>p.v))*1.04||1, step=niceStep(vmax,4), top=Math.ceil(vmax/step)*step;
+  const X=d=>m.l+(d-s0)/(s1-s0)*(W-m.l-m.r), Y=v=>H-m.b-(v/top)*(H-m.t-m.b), base=H-m.b;
+  const line=k=>pts.map((p,i)=>(i?'L':'M')+X(p.day).toFixed(1)+' '+Y(p[k]).toFixed(1)).join(' ');
+  const area=k=>line(k)+' L'+X(s1).toFixed(1)+' '+base+' L'+X(s0).toFixed(1)+' '+base+' Z';
+  let g='';
+  for(let v=0;v<=top+1e-6;v+=step){ g+='<line class="grid" x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'"/><text x="'+(m.l-6)+'" y="'+(Y(v)+3.5).toFixed(1)+'" text-anchor="end">'+abbr(v)+'</text>'; }
+  const yrs=[]; for(let yy=Number(startS.slice(0,4))+1;yy<=Number(endS.slice(0,4));yy++) yrs.push(yy);
+  const every=yrs.length>7?2:1;
+  yrs.forEach((yy,i)=>{ if(i%every) return; const x=X(Math.floor(Date.UTC(yy,0,1)/DAY)); g+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+yy+'</text>'; });
+  let marks='';
+  if(dn(TODAY)>s0 && dn(TODAY)<s1){ const x=X(dn(TODAY)).toFixed(1); marks+='<line class="today" x1="'+x+'" x2="'+x+'" y1="'+m.t+'" y2="'+base+'"/>'; }
+  for(const a of state.accounts){ const mt=addYears(a.opened,5); const r=combinedAt(mt); marks+='<circle class="mat" cx="'+X(dn(mt)).toFixed(1)+'" cy="'+Y(r.v).toFixed(1)+'" r="4"/>'; }
+  el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" role="img" aria-label="Estimated value of your MP2 accounts through maturity">'
+    +g+'<path class="a-val" d="'+area('v')+'"/><path class="a-con" d="'+area('c')+'"/>'
+    +'<path class="l-con" d="'+line('c')+'"/><path class="l-val" d="'+line('v')+'"/>'+marks
+    +'<line class="axis" x1="'+m.l+'" x2="'+(W-m.r)+'" y1="'+base+'" y2="'+base+'"/>'
+    +'<line class="xh" id="xh" x1="0" x2="0" y1="'+m.t+'" y2="'+base+'" visibility="hidden"/>'
+    +'<rect id="hit" x="'+m.l+'" y="0" width="'+(W-m.l-m.r)+'" height="'+H+'" fill="transparent"/></svg>';
+  chartData={pts,X,s0,s1};
+  const last=pts[pts.length-1];
+  const show=p=>{ ro.innerHTML='<span>'+esc(fmtMonth(p.day*DAY))+'</span><span>Value <b>'+peso0(p.v)+'</b></span><span>Contributed <b>'+peso0(p.c)+'</b></span><span>Dividends <b>'+peso0(Math.max(0,p.v-p.c))+'</b></span>'; };
+  show(last);
+  const svg=el.querySelector('svg'), xh=$('#xh'), hit=$('#hit');
+  function move(e){
+    const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*(W/r.width);
+    let best=pts[0],bd=1e9; for(const p of pts){ const dd=Math.abs(X(p.day)-px); if(dd<bd){bd=dd;best=p;} }
+    xh.setAttribute('x1',X(best.day)); xh.setAttribute('x2',X(best.day)); xh.setAttribute('visibility','visible'); show(best);
+  }
+  let pointerFrame=0;hit.addEventListener('pointermove',e=>{if(pointerFrame)return;const x=e.clientX;pointerFrame=requestAnimationFrame(()=>{pointerFrame=0;move({clientX:x});});}); hit.addEventListener('pointerdown',move);
+  hit.addEventListener('pointerleave',()=>{ xh.setAttribute('visibility','hidden'); show(last); });
+}
+
+// ---------- render: scenarios ----------
+function renderScen(){
+  const el=$('#scen');
+  if(!state.accounts.length){ el.innerHTML=''; return; }
+  const a=state.assumed, cases=[Math.max(0,a-1),a,a+1];
+  const rows=cases.map((r,i)=>{ const P=portfolio(r); return '<tr'+(i===1?' class="hl"':'')+'><td class="mono">'+pct(r)+(i===1?' (yours)':'')+'</td><td class="n">'+peso0(P.fValue)+'</td><td class="n">'+peso0(P.fDiv)+'</td></tr>'; }).join('');
+  el.innerHTML='<h3>What if the rate is different?</h3><p class="note">Total across all accounts at their maturity dates, including planned monthly contributions. Declared years keep their declared rate.</p>'
+    +'<div class="scroll"><table><thead><tr><th>Future rate</th><th class="n">Total at maturity</th><th class="n">Dividends</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ---------- render: accounts ----------
+function accountCard(a){
+  const mat=addYears(a.opened,5), matured=TODAY>=mat;
+  const now=cachedSim(a,state.assumed,TODAY,false);
+  const end=cachedSim(a,state.assumed,mat,true);
+  const total=dn(mat)-dn(a.opened), done=Math.min(total,Math.max(0,dn(TODAY)-dn(a.opened))), pc=Math.round(done/total*100);
+  const id=esc(a.id);
+  let h='<article class="acct" id="acct-'+id+'"><div class="acct-h"><div class="acct-title"><h3>'+esc(a.name)+'</h3><div class="chips">'
+    +'<span class="chip '+(a.mode==='compound'?'ok':'warn')+'">'+(a.mode==='compound'?'Dividends compound':'Paid out yearly')+'</span>'
+    +'<span class="chip">'+(matured?'Matured · withdrawal unconfirmed':span(TODAY,mat)+' left')+'</span></div></div>'
+    +'<div><div class="term" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pc+'" aria-label="Term elapsed"><i style="width:'+pc+'%"></i></div>'
+    +'<div class="term-cap"><span>Opened '+esc(fmtDate(a.opened))+'</span><span>'+pc+'% of term</span><span>Matures '+esc(fmtDate(mat))+'</span></div></div>'
+    +'<dl class="facts"><div><dt>Contributed</dt><dd>'+peso0(now.principal)+'</dd></div>'
+    +'<div><dt>Dividends so far</dt><dd>'+peso0(now.div)+(a.mode==='payout'?'<small>estimated annual payouts; not verified</small>':'')+'</dd></div>'
+    +'<div><dt>Estimated account balance</dt><dd>'+peso0(now.balance)+'</dd></div>'
+    +'<div><dt>'+(matured?'Estimated maturity proceeds':'At maturity')+'</dt><dd>'+peso0(end.value)+(a.monthly>0&&!matured?'<small>with '+peso0(a.monthly)+'/mo planned</small>':'')+'</dd></div>'+(matured?'<div><dt>Post-maturity P1 dividends (estimate)</dt><dd>'+(now.p1Rate===null?'Set P1 rate':peso0(now.p1Div))+'<small>Maximum 24 months; no assumed rate entered automatically</small></dd></div>':'')+'</dl></div>'
+    +'<div class="acct-actions"><button class="btn" type="button" data-act="ledger" data-id="'+id+'" aria-pressed="'+(!!ui.open[a.id])+'">Ledger</button>'
+    +(isSample?'':'<button class="btn" type="button" data-act="edit" data-id="'+id+'" aria-pressed="'+(!!ui.edit[a.id])+'">Edit</button>')+(isSample||matured?'':reminderLinks(a,mat,end))+'</div>';
+  if(ui.open[a.id]) h+=ledgerPanel(a,end,mat);
+  if(ui.edit[a.id] && !isSample) h+=editPanel(a);
+  return h+'</article>';
+}
+function gcal(title,dateS,details){
+  const a=dateS.replace(/-/g,''), b=ds(pd(dateS)+DAY).replace(/-/g,'');
+  return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(title)+'&dates='+a+'/'+b+'&details='+encodeURIComponent(details);
+}
+function reminderLinks(a,mat,end){
+  const det='MP2 account "'+a.name+'" matures on '+fmtDate(mat)+'. Estimated payout about '+peso0(end.value)+' (estimate from MP2 Monitor; check Virtual Pag-IBIG).';
+  let h='';
+  h+='<a class="btn" target="_blank" rel="noopener" href="'+esc(gcal('MP2 matures: '+a.name,mat,det))+'">Calendar reminder · maturity day</a>';
+  return h;
+}
+function ledgerPanel(a,end,mat){
+  const id=esc(a.id), sorted=a.contribs.slice().sort((x,y)=>y.date.localeCompare(x.date)), shown=ui.all[a.id]?sorted:sorted.slice(0,10);
+  const err=ui.err[a.id]?'<p class="err" role="alert">'+esc(ui.err[a.id])+'</p>':'';
+  let h='<div class="panel">';
+  if(!isSample){
+    h+='<form data-form="contrib" data-id="'+id+'"><h4>Add a contribution</h4><div class="fields" style="margin-top:8px">'
+      +'<label>Date<input type="date" name="date" id="cd-'+id+'" value="'+esc(TODAY<mat?TODAY:mat)+'" required></label>'
+      +'<label>Amount (₱)<input type="number" name="amount" id="ca-'+id+'" inputmode="decimal" min="1" step="0.01" placeholder="2000" required></label>'
+      +'<button class="btn primary" type="submit">Add</button></div></form>'+err;
+  }
+  h+='<div><h4>Contributions · '+a.contribs.length+'</h4>';
+  if(!sorted.length) h+='<p class="hint" style="margin-top:6px">Nothing logged yet.</p>';
+  else{
+    h+='<div class="tbl scroll" style="margin-top:8px"><table><thead><tr><th>Date</th><th class="n">Amount</th>'+(isSample?'':'<th></th>')+'</tr></thead><tbody>'
+      +shown.map(c=>'<tr><td class="mono">'+esc(fmtDate(c.date))+'</td><td class="n">'+peso2(c.amount)+'</td>'+(isSample?'':'<td class="n"><button class="xbtn" type="button" data-act="editc" data-id="'+id+'" data-cid="'+esc(c.id)+'" aria-label="Edit contribution">✎</button><button class="xbtn" type="button" data-act="delc" data-id="'+id+'" data-cid="'+esc(c.id)+'" aria-label="Remove contribution of '+peso2(c.amount)+' on '+esc(fmtDate(c.date))+'">×</button></td>')+'</tr>').join('')
+      +'</tbody></table></div>';
+    if(sorted.length>10) h+='<button class="btn quiet" type="button" data-act="all" data-id="'+id+'">'+(ui.all[a.id]?'Show latest 10':'Show all '+sorted.length)+'</button>';
+  }
+  h+='</div>';
+  if(ui.editContrib && ui.editContrib.account===a.id){
+    const c=a.contribs.find(x=>x.id===ui.editContrib.cid);
+    if(c)h+='<form data-form="editc" data-id="'+id+'" class="fields" style="padding:10px;background:var(--surface);border-radius:8px"><input type="hidden" name="cid" value="'+esc(c.id)+'"><label>Edit date<input type="date" name="date" value="'+esc(c.date)+'" required></label><label>Amount (₱)<input type="number" name="amount" min="0.01" step="0.01" value="'+c.amount+'" required></label><button class="btn primary" type="submit">Save contribution</button><button class="btn" type="button" data-act="editc-cancel">Cancel</button></form>';
+  }
+  if(!isSample){
+    h+='<details><summary>Paste several contributions</summary><form data-form="paste" data-id="'+id+'"><label class="hint" for="pt-'+id+'">One per line: date, then amount. Dates as 2024-03-10 or 03/10/2024 (month first).</label>'
+      +'<textarea id="pt-'+id+'" name="text" placeholder="2024-03-10, 2000&#10;2024-04-10, 2000"></textarea><div class="row" style="margin-top:8px"><button class="btn" type="submit">Add these</button></div></form></details>';
+  }
+  h+='<div><h4>Year by year (estimate)</h4><div class="tbl scroll" style="margin-top:8px"><table><thead><tr><th>Year</th><th class="n">Rate</th><th class="n">Added</th><th class="n">Dividend</th><th class="n">'+(a.mode==='compound'?'Balance':'Contributed')+'</th></tr></thead><tbody>'
+    +end.rows.map(r=>'<tr><td class="mono">'+r.year+(r.partial?'*':'')+'</td><td class="n">'+(r.declared?pct(r.rate):'<span class="asm">'+pct(r.rate)+' assumed</span>')+'</td><td class="n">'+peso0(r.added)+'</td><td class="n">'+peso0(r.div)+'</td><td class="n">'+peso0(r.balance)+'</td></tr>').join('')
+    +'</tbody></table></div><p class="hint" style="margin-top:6px">* Part of the year only. Earnings stop before the fifth-anniversary month.</p></div></div>';
+  return h;
+}
+function editPanel(a){
+  const id=esc(a.id), err=ui.err['e'+a.id]?'<p class="err" role="alert">'+esc(ui.err['e'+a.id])+'</p>':'';
+  return '<form class="panel" data-form="edit" data-id="'+id+'"><h4>Account details</h4><div class="fields">'
+    +'<label>Name<input name="name" id="en-'+id+'" value="'+esc(a.name)+'" maxlength="60" required></label>'
+    +'<label>Opened on<input type="date" name="opened" id="eo-'+id+'" value="'+esc(a.opened)+'" required></label>'
+    +'<label>Dividends<select name="mode" id="em-'+id+'"><option value="compound"'+(a.mode==='compound'?' selected':'')+'>Compound until maturity</option><option value="payout"'+(a.mode==='payout'?' selected':'')+'>Paid out yearly</option></select></label>'
+    +'<label>P1 annual rate after maturity (%)<input type="number" name="p1Rate" min="0" max="20" step="0.01" placeholder="Enter actual P1 rate" value="'+esc(a.p1Rate??'')+'"></label>'
+    +'<label>Withdrawal date (optional)<input type="date" name="withdrawn" value="'+esc(a.withdrawn||'')+'"></label>'
+    +'<label>Planned monthly (₱)<input type="number" name="monthly" id="ep-'+id+'" inputmode="decimal" min="0" step="1" value="'+(a.monthly||'')+'" placeholder="0"></label></div>'
+    +err+'<div class="row"><button class="btn primary" type="submit">Save changes</button>'
+    +(ui.confirm[a.id]?'<button class="btn danger" type="button" data-act="delacct-yes" data-id="'+id+'">Yes, delete this account</button><button class="btn quiet" type="button" data-act="delacct-no" data-id="'+id+'">Keep it</button>':'<button class="btn quiet" type="button" data-act="delacct" data-id="'+id+'" style="color:var(--bad)">Delete account</button>')
+    +'</div></form>';
+}
+function addForm(){
+  return '<form class="acct" data-form="add"><div class="panel" style="border-top:none;background:var(--surface)"><h3 style="font-size:17px">New MP2 account</h3><div class="fields">'
+    +'<label>Name<input name="name" id="an" value="'+esc('MP2 account '+(state.accounts.length+1))+'" maxlength="60" required></label>'
+    +'<label>Opened on<input type="date" name="opened" id="ao" value="'+esc(TODAY)+'" max="'+esc(TODAY)+'" required></label>'
+    +'<label>Dividends<select name="mode" id="am"><option value="compound">Compound until maturity</option><option value="payout">Paid out yearly</option></select></label>'
+    +'<label>Planned monthly (₱)<input type="number" name="monthly" id="ap" inputmode="decimal" min="0" step="1" placeholder="0"></label></div>'
+    +'<p class="hint">Opening date is when you first put money into this account. You can log contributions after saving.</p>'
+    +(ui.addErr?'<p class="err" role="alert">'+esc(ui.addErr)+'</p>':'')
+    +'<div class="row"><button class="btn primary" type="submit">Create account</button><button class="btn quiet" type="button" data-act="add-cancel">Cancel</button></div></div></form>';
+}
+function renderAccounts(){
+  const el=$('#accounts');
+  let h=ui.adding?addForm():'';
+  if(!state.accounts.length && !ui.adding) h='<div class="empty"><p>Your accounts will be listed here.</p></div>';
+  h+=state.accounts.map(accountCard).join('');
+  el.innerHTML=h;
+}
+
+// ---------- render: rates ----------
+function renderRates(){
+  const el=$('#rates');
+  const minY=state.accounts.length?Math.min.apply(null,state.accounts.map(a=>Number(a.opened.slice(0,4)))):THIS_YEAR-2;
+  const y0=Math.min(minY,THIS_YEAR-2); let rows='';
+  for(let y=THIS_YEAR;y>=y0;y--){
+    const v=state.rates[y]; const has=v!=null&&v!=='';
+    rows+='<tr><td class="mono">'+y+'</td><td><input type="number" inputmode="decimal" step="0.01" min="0" max="20" id="rate-'+y+'" data-year="'+y+'" value="'+(has?v:'')+'"'+(isSample?' disabled':'')+' placeholder="—" aria-label="Declared rate for '+y+', percent"> <span class="mono">%</span></td><td>'+(has?'<span class="chip ok">Declared</span>':'<span class="chip warn">'+(y>=THIS_YEAR?'Not declared yet':'Missing')+' · using '+pct(state.assumed)+'</span>')+'</td></tr>';
+  }
+  el.innerHTML='<div class="tbl" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px 8px"><table class="rates"><thead><tr><th>Year earned</th><th>MP2 rate</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ---------- render orchestration ----------
+function syncAssumed(){ $('#assumed').value=state.assumed; $('#assumed-range').value=Math.min(10,Math.max(3,state.assumed)); }
+function renderLive(){ renderHero(); renderChart(); renderScen(); }
+function renderBackup(){
+  const el=$('#bak-extra'); let h='';
+  if(ui.importPending){
+    const n=ui.importPending, cn=n.accounts.reduce((t,a)=>t+a.contribs.length,0);
+    h+='<div class="copybox"><p>Replace the data here with this backup? It has '+n.accounts.length+' account'+(n.accounts.length===1?'':'s')+' and '+cn+' contribution'+(cn===1?'':'s')+'. What is here now will be overwritten.</p><div class="row"><button class="btn danger" type="button" data-act="imp-yes">Replace with backup</button><button class="btn quiet" type="button" data-act="imp-no">Cancel</button></div></div>';
+  }
+  if(ui.copyText){
+    h+='<div class="copybox"><label class="hint" for="bak-text">Copy this text and keep it in a file named backup.json.</label><textarea id="bak-text" readonly>'+esc(ui.copyText)+'</textarea><div class="row"><button class="btn" type="button" data-act="copy">Copy</button><button class="btn quiet" type="button" data-act="copy-close">Close</button></div></div>';
+  }
+  el.innerHTML=h;
+}
+function bakMsg(t){ $('#bak-msg').textContent=t; }
+function renderAll(){ syncAssumed(); renderNotice(); renderLive(); renderAccounts(); renderRates(); renderBackup(); }
+function commit(){ revision++;simCache.clear();renderAll(); scheduleSave(); }
+
+// ---------- actions ----------
+function startReal(){ if(isSample){ state=freshState(); isSample=false; } }
+function acct(id){ return state.accounts.find(a=>a.id===id); }
+let toastTimer=null;
+function toast(msg,undo){
+  const t=$('#toast'); clearTimeout(toastTimer);
+  t.innerHTML='<div><span>'+esc(msg)+'</span>'+(undo?'<button type="button" id="undo">Undo</button>':'')+'</div>';
+  if(undo) $('#undo').addEventListener('click',()=>{ undo(); t.innerHTML=''; });
+  toastTimer=setTimeout(()=>{t.innerHTML='';},7000);
+}
+function parseLines(txt){
+  const ok=[],bad=[];
+  for(const raw of txt.split(/\r?\n/)){
+    const line=raw.trim(); if(!line) continue;
+    const m=line.match(/^(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})[\s,;\t]+₱?\s*([\d,]+(?:\.\d+)?)$/);
+    if(!m){ bad.push(line); continue; }
+    let d=m[1]; if(d.includes('/')){ const q=d.split('/').map(Number); d=q[2]+'-'+p2(q[0])+'-'+p2(q[1]); }
+    const amt=Number(m[2].replace(/,/g,''));
+    if(!isISO(d)||!(amt>0)){ bad.push(line); continue; }
+    ok.push({date:d,amount:amt});
+  }
+  return {ok,bad};
+}
+function addContribs(a,items){
+  const mat=addYears(a.opened,5); let added=0,rejected=0,duplicates=0;
+  for(const it of items){
+    if(it.date<a.opened||it.date>=mat){ rejected++; continue; }
+    if(a.contribs.some(c=>c.date===it.date && c.amount===it.amount)){duplicates++;continue;}
+    a.contribs.push({id:uid(),date:it.date,amount:it.amount}); added++;
+  }
+  return {added,rejected,duplicates};
+}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const act=b.dataset.act, id=b.dataset.id;
+  if(act==='start'||act==='add'){ startReal(); ui.adding=true; ui.addErr=''; renderAll(); const f=$('#an'); if(f){ f.scrollIntoView({block:'center'}); f.focus(); } return; }
+  if(act==='add-cancel'){ ui.adding=false; renderAccounts(); return; }
+  if(act==='imp-yes'){ if(ui.importPending){ state=ui.importPending; isSample=false; ui.importPending=null; ui.open={}; ui.edit={}; commit(); bakMsg('Backup restored.'); } return; }
+  if(act==='imp-no'){ ui.importPending=null; renderBackup(); bakMsg(''); return; }
+  if(act==='copy-close'){ ui.copyText=''; renderBackup(); return; }
+  if(act==='copy'){
+    const t=$('#bak-text');
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(ui.copyText).then(()=>bakMsg('Copied.'),()=>{ t.select(); bakMsg('Select the text and copy it.'); }); }
+    else { t.select(); bakMsg('Select the text and copy it.'); }
+    return;
+  }
+  if(act==='editc'){ui.editContrib={account:id,cid:b.dataset.cid};renderAccounts();return;}
+  if(act==='editc-cancel'){ui.editContrib=null;renderAccounts();return;}
+  if(act==='ledger'){ ui.open[id]=!ui.open[id]; renderAccounts(); return; }
+  if(act==='edit'){ ui.edit[id]=!ui.edit[id]; ui.confirm[id]=false; renderAccounts(); return; }
+  if(act==='all'){ ui.all[id]=!ui.all[id]; renderAccounts(); return; }
+  if(act==='delacct'){ ui.confirm[id]=true; renderAccounts(); return; }
+  if(act==='delacct-no'){ ui.confirm[id]=false; renderAccounts(); return; }
+  if(act==='delacct-yes'){
+    const i=state.accounts.findIndex(a=>a.id===id); if(i<0) return;
+    const gone=state.accounts.splice(i,1)[0]; ui.confirm[id]=false; commit();
+    toast('Deleted '+gone.name,()=>{ state.accounts.splice(Math.min(i,state.accounts.length),0,gone); commit(); });
+    return;
+  }
+  if(act==='delc'){
+    const a=acct(id); if(!a) return; const i=a.contribs.findIndex(c=>c.id===b.dataset.cid); if(i<0) return;
+    const gone=a.contribs.splice(i,1)[0]; commit();
+    toast('Removed '+peso2(gone.amount),()=>{ a.contribs.push(gone); commit(); });
+  }
+});
+
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-form]'); if(!f) return; e.preventDefault();
+  const kind=f.dataset.form, id=f.dataset.id, fd=new FormData(f);
+  if(kind==='add'){
+    const name=String(fd.get('name')||'').trim()||'MP2 account', opened=String(fd.get('opened')||'');
+    if(!isISO(opened)){ ui.addErr='Enter the date you opened the account.'; renderAccounts(); return; }
+    if(opened>TODAY){ ui.addErr='The opening date cannot be in the future.'; renderAccounts(); return; }
+    const a={id:uid(),name,opened,mode:fd.get('mode')==='payout'?'payout':'compound',p1Rate:'',withdrawn:'',monthly:Math.max(0,Number(fd.get('monthly'))||0),contribs:[]};
+    state.accounts.push(a); ui.adding=false; ui.addErr=''; ui.open[a.id]=true; commit();
+    const el=$('#acct-'+a.id); if(el) el.scrollIntoView({block:'start'});
+    return;
+  }
+  const a=acct(id); if(!a) return;
+  if(kind==='editc'){
+    const c=a.contribs.find(x=>x.id===fd.get('cid'));
+    const date=String(fd.get('date')||''),amount=Number(fd.get('amount'));
+    if(!c || !isISO(date) || date<a.opened || date>=addYears(a.opened,5) || !Number.isFinite(amount) || amount<=0){ui.err[id]='Enter a valid date within the account term and positive amount.';renderAccounts();return;}
+    if(a.contribs.some(x=>x.id!==c.id && x.date===date && x.amount===amount)){ui.err[id]='An identical contribution already exists. No change saved.';renderAccounts();return;}
+    c.date=date;c.amount=amount;ui.editContrib=null;ui.err[id]='';commit();return;
+  }
+  if(kind==='contrib'){
+    const date=String(fd.get('date')||''), amount=Number(fd.get('amount'));
+    const mat=addYears(a.opened,5);
+    if(!isISO(date)||!(amount>0)){ ui.err[id]='Enter a date and an amount above zero.'; renderAccounts(); return; }
+    if(date<a.opened){ ui.err[id]='That date is before the account opened on '+fmtDate(a.opened)+'. Change the opening date under Edit if it is wrong.'; renderAccounts(); return; }
+    if(date>=mat){ ui.err[id]='That date is on or after the maturity date, '+fmtDate(mat)+'.'; renderAccounts(); return; }
+    if(a.contribs.some(c=>c.date===date && c.amount===amount)){ui.err[id]='An identical contribution already exists. Check the ledger before adding it again.';renderAccounts();return;}
+    a.contribs.push({id:uid(),date,amount}); ui.err[id]=''; commit();
+    const inp=$('#ca-'+a.id); if(inp) inp.focus();
+    return;
+  }
+  if(kind==='paste'){
+    const r=parseLines(String(fd.get('text')||'')); const res=addContribs(a,r.ok);
+    const notes=[]; if(r.bad.length) notes.push(r.bad.length+' line'+(r.bad.length>1?'s':'')+' not understood'); if(res.rejected) notes.push(res.rejected+' outside the account term'); if(res.duplicates) notes.push(res.duplicates+' duplicate entries skipped');
+    ui.err[id]=notes.length?(res.added+' added. '+notes.join(', ')+'.'):''; commit(); return;
+  }
+  if(kind==='edit'){
+    const name=String(fd.get('name')||'').trim()||a.name, opened=String(fd.get('opened')||'');
+    if(!isISO(opened)||opened>TODAY){ ui.err['e'+id]='Enter an opening date that is not in the future.'; renderAccounts(); return; }
+    const early=a.contribs.filter(c=>c.date<opened||c.date>=addYears(opened,5)).length;
+    if(early){ ui.err['e'+id]=early+' logged contribution'+(early>1?'s fall':' falls')+' outside the new 5-year term. Remove or fix '+(early>1?'them':'it')+' first.'; renderAccounts(); return; }
+    a.name=name; a.opened=opened; a.mode=fd.get('mode')==='payout'?'payout':'compound'; a.monthly=Math.max(0,Number(fd.get('monthly'))||0);
+    const pr=String(fd.get('p1Rate')??''); if(pr!=='' && (!Number.isFinite(Number(pr)) || Number(pr)<0 || Number(pr)>20)){ui.err['e'+id]='P1 rate must be 0–20%, or blank.';renderAccounts();return;}
+    const wd=String(fd.get('withdrawn')||'');if(wd && (!isISO(wd)||wd<addYears(a.opened,5))){ui.err['e'+id]='Withdrawal date must be on or after maturity.';renderAccounts();return;}
+    a.p1Rate=pr===''?'':Number(pr);a.withdrawn=wd;
+    ui.err['e'+id]=''; ui.edit[id]=false; commit();
+  }
+});
+
+let liveFrame=0;function scheduleLiveRender(){if(liveFrame)cancelAnimationFrame(liveFrame);liveFrame=requestAnimationFrame(()=>{liveFrame=0;renderLive();});}
+// assumed rate: live while dragging, accounts refresh on release
+function setAssumed(v,final){
+  if(!isFinite(v)) return; v=Math.min(15,Math.max(0,v)); state.assumed=Math.round(v*100)/100; revision++;simCache.clear();
+  if(document.activeElement!==$('#assumed')) $('#assumed').value=state.assumed;
+  $('#assumed-range').value=Math.min(10,Math.max(3,state.assumed));
+  scheduleLiveRender();
+  if(final){ renderAccounts(); renderRates(); if(!isSample) scheduleSave(); }
+}
+$('#assumed-range').addEventListener('input',e=>setAssumed(Number(e.target.value),false));
+$('#assumed-range').addEventListener('change',e=>setAssumed(Number(e.target.value),true));
+$('#assumed').addEventListener('input',e=>{ const v=Number(e.target.value); if(e.target.value!=='' && isFinite(v)) setAssumed(v,false); });
+$('#assumed').addEventListener('change',e=>{ const v=Number(e.target.value); setAssumed(e.target.value===''?state.assumed:v,true); $('#assumed').value=state.assumed; });
+$('#add-acct').addEventListener('click',()=>{ startReal(); ui.adding=true; ui.addErr=''; renderAll(); const f=$('#an'); if(f){ f.scrollIntoView({block:'center'}); f.focus(); } });
+$('#rates').addEventListener('change',e=>{
+  const i=e.target.closest('[data-year]'); if(!i) return;
+  startReal(); const y=i.dataset.year;
+  if(i.value==='')delete state.rates[y];else if(Number.isFinite(Number(i.value)) && Number(i.value)>=0 && Number(i.value)<=20)state.rates[y]=Math.round(Number(i.value)*100)/100;else{bakMsg('Dividend rates must be between 0% and 20%.');renderRates();return;}
+  commit();
+});
+
+// backup
+function backupJSON(){ return JSON.stringify({app:'mp2-monitor',version:2,exportedAt:new Date().toISOString(),data:state},null,2); }
+$('#exp').addEventListener('click',()=>{
+  if(isSample){bakMsg('Add your accounts first. There is nothing of yours to back up yet.');return;}
+  const contents=backupJSON(),name='mp2-monitor-backup-'+TODAY+'.json';
+  try{const blob=new Blob([contents],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob);
+    const link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);bakMsg('Backup download requested: '+name+'.');
+  }catch(e){ui.copyText=contents;renderBackup();bakMsg('Download unavailable. Copy the backup text below.');}
+});
+$('#impbtn').addEventListener('click',()=>$('#imp').click());
+$('#imp').addEventListener('change',e=>{
+  const f=e.target.files && e.target.files[0]; e.target.value='';
+  if(!f) return;
+  if(f.size>5*1024*1024){ bakMsg('That file is too large to be an MP2 Monitor backup.'); return; }
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const j=JSON.parse(String(fr.result)), d=(j && j.data)?j.data:j;
+      if(!d || !Array.isArray(d.accounts) || d.accounts.length>1000 || (j.app && j.app!=='mp2-monitor') || (j.version && j.version>2))throw new Error('shape');
+      for(const a of d.accounts){
+        if(!a || !isISO(a.opened) || !Array.isArray(a.contribs) || a.contribs.length>10000 || typeof a.name!=='string')throw new Error('account');
+        for(const c of a.contribs){if(!c || !isISO(c.date) || c.date<a.opened || c.date>=addYears(a.opened,5) || !Number.isFinite(Number(c.amount)) || Number(c.amount)<=0)throw new Error('contribution');}
+      }
+      ui.importPending=normalize(d); bakMsg(''); renderBackup();
+    }catch(err){ bakMsg('That file is not an MP2 Monitor backup.'); }
+  };
+  fr.onerror=()=>bakMsg('Could not read that file.');
+  fr.readAsText(f);
+});
+
+window.MP2CloudBridge={isReady:()=>loaded,isSample:()=>isSample,get:()=>isSample?null:JSON.parse(JSON.stringify(state)),replace:(data)=>{state=normalize(data);isSample=false;revision++;simCache.clear();renderAll();scheduleSave();}};
+// resize
+let rz=null;
+if(window.ResizeObserver){ new ResizeObserver(()=>{ cancelAnimationFrame(rz); rz=requestAnimationFrame(renderChart); }).observe($('#chart')); }
+else window.addEventListener('resize',()=>renderChart());
+
+renderAll();
+initStore();
+})();
+</script>
+
+<script>
+// Service workers require HTTPS or localhost. The HTML also works independently as a local file.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.warn('Offline install unavailable:', err)));
+}
+</script>
+<script type="module">
+// Firebase client uses a per-user Firestore document; never embed privileged credentials.
+import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,onAuthStateChanged,signOut} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import {getFirestore,doc,getDoc,runTransaction,serverTimestamp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+const $=id=>document.getElementById(id), KEY='mp2-firebase-config-v1', BASE='mp2-firebase-base-v1';
+const DEFAULT_CONFIG = {"apiKey":"AIzaSyBHeaOKNhRks01MbNUd_iMDls07Q5K-SZE","authDomain":"mp2---monitor.firebaseapp.com","projectId":"mp2---monitor","storageBucket":"mp2---monitor.firebasestorage.app","messagingSenderId":"1009548968760","appId":"1:1009548968760:web:ab247f7d3d8df1bd6b77cd"};
+let auth,db,user,ready=false,working=false,timer=null,cloudDoc=null,cloudRev=null,baseRev=null,decision=null,localChanged=false;
+const say=t=>{$('fb-status').textContent=t};
+const state=()=>window.MP2CloudBridge?.get();
+const uidKey=()=>BASE+':'+(user?.uid||'');
+function loadBase(){baseRev=localStorage.getItem(uidKey())||null;}
+function storeBase(v){baseRev=v; if(v)localStorage.setItem(uidKey(),v);else localStorage.removeItem(uidKey());}
+function showDecision(message,callback){decision=callback;$('fb-decision-text').textContent=message;$('fb-decision').hidden=false;}
+function hideDecision(){decision=null;$('fb-decision').hidden=true;}
+function setButtons(){ $('fb-signin').hidden=!!user;$('fb-signout').hidden=!user;$('fb-sync').disabled=!user; }
+function valid(c){return c&&['apiKey','authDomain','projectId','appId'].every(k=>typeof c[k]==='string'&&c[k].trim());}
+async function configure(){const raw=localStorage.getItem(KEY)||JSON.stringify(DEFAULT_CONFIG);try{const cfg=JSON.parse(raw);if(!valid(cfg))throw Error('Missing required Firebase fields');$('fb-config').value=JSON.stringify(cfg,null,2);const app=initializeApp(cfg);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,async u=>{user=u;setButtons();if(!u){say('Not signed in · saved locally in IndexedDB');return;}loadBase();say('Signed in as '+(u.email||'Google user')+' · checking cloud…');await sync();});await getRedirectResult(auth).catch(e=>say('Google sign-in: '+e.message));}catch(e){say('Firebase configuration error: '+e.message);}}
+$('fb-save-config').onclick=()=>{try{const cfg=JSON.parse($('fb-config').value);if(!valid(cfg))throw Error('apiKey, authDomain, projectId and appId are required');localStorage.setItem(KEY,JSON.stringify(cfg));say('Configuration saved. Reload this page to activate Firebase.');}catch(e){say('Configuration invalid: '+e.message)}};
+$('fb-signin').onclick=async()=>{if(!auth){say('Save your Firebase configuration, then reload first.');return;}try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){await signInWithRedirect(auth,new GoogleAuthProvider());}else say('Sign-in failed: '+e.message);}};
+$('fb-signout').onclick=async()=>{hideDecision();await signOut(auth);};
+$('fb-sync').onclick=()=>sync();
+$('fb-cancel').onclick=()=>{hideDecision();say('Sync paused. Local data is unchanged.')};
+$('fb-use-local').onclick=async()=>{const cb=decision;hideDecision();if(cb)await cb('local');};
+$('fb-use-cloud').onclick=async()=>{const cb=decision;hideDecision();if(cb)await cb('cloud');};
+function schedule(){localChanged=true;clearTimeout(timer);timer=setTimeout(()=>sync(),2200)}
+window.addEventListener('mp2-local-change',schedule);
+window.addEventListener('online',()=>sync());
+window.addEventListener('mp2-local-ready',()=>{ready=true;if(user)sync()});
+async function upload(expected){if(!user||!state())return;const data=state();const ref=doc(db,'users',user.uid,'mp2','snapshot');const newRev=crypto.randomUUID();await runTransaction(db,async tx=>{const snap=await tx.get(ref);const rev=snap.exists()?snap.data().rev:null;if(rev!==expected)throw Error('Cloud changed during upload. Sync again to resolve.');tx.set(ref,{data,rev:newRev,updatedAt:serverTimestamp(),format:2});});storeBase(newRev);localChanged=false;say('Cloud saved · '+new Date().toLocaleTimeString());}
+async function sync(){if(working||!user||!navigator.onLine||!ready)return;const local=state();working=true;try{const ref=doc(db,'users',user.uid,'mp2','snapshot');const snap=await getDoc(ref);const cloud=snap.exists()?snap.data():null;const rev=cloud?.rev||null;const localJSON=JSON.stringify(local),cloudJSON=cloud?.data?JSON.stringify(cloud.data):null;
+if(!cloud){if(!local){say('Start with your own accounts before syncing.');return;}if(baseRev){showDecision('Cloud snapshot is missing. Upload your current local data or pause.',async choice=>{if(choice==='local')await safeUpload(null);});}else{showDecision('First synchronization: upload the local MP2 accounts to your private cloud record? The cloud is currently empty.',async choice=>{if(choice==='local')await safeUpload(null);});}return;}
+if(!local){showDecision('Cloud MP2 records found. Restore them to this device? The example accounts will be replaced.',async choice=>{if((choice==='cloud'||choice==='local')&&cloud.data&&Array.isArray(cloud.data.accounts)){window.MP2CloudBridge.replace(cloud.data);storeBase(rev);say('Cloud copy restored locally.');}});return;}
+if(rev===baseRev){if(localJSON!==cloudJSON)await upload(rev);else{localChanged=false;say('Synchronized · '+(user.email||'Google account'));}return;}
+if(localJSON===cloudJSON){storeBase(rev);localChanged=false;say('Synchronized · '+(user.email||'Google account'));return;}
+showDecision('Local and cloud records differ. Choose which complete copy to keep. Upload replaces the cloud snapshot; Use cloud copy replaces local records. Export JSON first if unsure.',async choice=>{if(choice==='local')await safeUpload(rev);if(choice==='cloud'){if(!cloud.data||!Array.isArray(cloud.data.accounts)){say('Invalid cloud snapshot; local data untouched.');return;}window.MP2CloudBridge.replace(cloud.data);storeBase(rev);localChanged=false;say('Cloud copy restored locally and saved to IndexedDB.');}});
+}catch(e){say('Sync unavailable: '+e.message+' · local data retained.')}finally{working=false;}}
+async function safeUpload(expected){try{await upload(expected)}catch(e){say('Upload stopped: '+e.message+' · local data retained.')}}
+// Periodic checks also discover remote edits made on another device.
+setInterval(()=>{if(user&&!decision)sync()},60000);
+ready=!!window.MP2CloudBridge?.isReady();configure();
+</script>
+</body></html>
